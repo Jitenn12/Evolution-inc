@@ -60,24 +60,4 @@ c1, c2 = st.columns(2)
 with c1:
     s1 = st.selectbox("Select Salesman A", salesman_data["Salesman"].unique(), index=0)
 with c2:
-    s2 = st.selectbox("Select Salesman B", salesman_data["Salesman"].unique(), index=2)
-
-s1_row = salesman_data[salesman_data["Salesman"] == s1].iloc[0]
-s2_row = salesman_data[salesman_data["Salesman"] == s2].iloc[0]
-
-fig_comp = go.Figure(data=[
-    go.Bar(name=s1, x=["Billing", "Watch ASP"], y=[s1_row[month_key], s1_row["Watch_ASP"]]),
-    go.Bar(name=s2, x=["Billing", "Watch ASP"], y=[s2_row[month_key], s2_row["Watch_ASP"]])
-])
-fig_comp.update_layout(barmode='group', height=400)
-st.plotly_chart(fig_comp, use_container_width=True)
-
-# 6. Regional Insights
-st.header("📍 Regional Contribution")
-fig_pie = px.pie(salesman_data, values=month_key, names='Zone', hole=0.4, 
-                 color_discrete_sequence=px.colors.sequential.RdBu)
-st.plotly_chart(fig_pie, use_container_width=True)
-
-st.success("Dashboard Updated with latest Go Noise February figures.")
-
-
+    s2 = st.selectbox("Select Salesman B", salesman_data["Salesman"]
