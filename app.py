@@ -3,27 +3,26 @@ import pandas as pd
 import plotly.express as px
 from openai import OpenAI
 
+# ---------- OPENAI ----------
+
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="Evolution Inc Sales Intelligence", layout="wide")
 
 st.title("Evolution Inc AI Sales Intelligence Dashboard")
 
-# ---------------- COMPLETE SALES DATA ----------------
+# ---------- DATA ----------
 
 data = [
 
-# JANUARY WEST-1
 ["January","WEST-1 INDIA","FIROZ",13,33783,38,100534,0,0],
 ["January","WEST-1 INDIA","GURUNATH",7228,7011402,10398,14456438,6,6990],
 ["January","WEST-1 INDIA","J-CORP",20,15680,1,4750,0,0],
 ["January","WEST-1 INDIA","J",5111,4730444,6389,10225496,0,0],
 
-# JANUARY WEST-2
 ["January","WEST-2 INDIA","DINESH",3052,4479353,2690,4345648,90,175050],
 ["January","WEST-2 INDIA","JULESH",2326,2846038,3654,6491939,17,19805],
 
-# JANUARY MUMBAI
 ["January","MUMBAI D2R","AMIT",143,214900,269,489864,0,0],
 ["January","MUMBAI D2R","LAXMAN",439,641890,498,1267414,1,2067],
 ["January","MUMBAI D2R","NILESH",147,166844,247,408888,0,0],
@@ -32,35 +31,26 @@ data = [
 ["January","MUMBAI D2R","TUKARAM",134,171187,220,364287,0,0],
 ["January","MUMBAI D2R","KALPESH",2,2109,0,0,0,0],
 
-# JANUARY PUNE
 ["January","PUNE D2R","FIROZ",112,103472,567,934789,0,0],
 ["January","PUNE D2R","GIRISH",192,360738,149,333707,0,0],
-["January","PUNE D2R","KALPESH",0,0,0,0,0,0],
 
-# FEB WEST-1
 ["February","WEST-1 INDIA","FIROZ",3,12997,63,176951,0,0],
 ["February","WEST-1 INDIA","GURUNATH",4922,5021419,9844,13182573,765,1487925],
 ["February","WEST-1 INDIA","J-CORP",275,392490,42,49974,0,0],
 ["February","WEST-1 INDIA","J",3668,3486360,3345,5527059,300,577800],
 
-# FEB WEST-2
 ["February","WEST-2 INDIA","DINESH",1308,1338016,4744,6273006,255,417975],
 ["February","WEST-2 INDIA","JULESH",3068,3190321,5731,9013208,600,1151400],
 
-# FEB MUMBAI
 ["February","MUMBAI D2R","AMIT",183,210327,304,471861,11,22613],
 ["February","MUMBAI D2R","LAXMAN",310,412839,533,1117105,24,35749],
 ["February","MUMBAI D2R","NILESH",168,198607,281,465939,13,20707],
 ["February","MUMBAI D2R","RAKESH",170,217197,498,879009,24,45216],
 ["February","MUMBAI D2R","SANDEEP",173,201265,398,883620,4,8132],
 ["February","MUMBAI D2R","TUKARAM",270,347908,178,290851,3,6420],
-["February","MUMBAI D2R","J",13,56680,0,0,0,0],
-["February","MUMBAI D2R","KALPESH",3,3224,6,20309,1,1282],
 
-# FEB PUNE
 ["February","PUNE D2R","FIROZ",85,84970,172,341024,0,0],
-["February","PUNE D2R","GIRISH",85,94869,121,321691,6,12326],
-["February","PUNE D2R","KALPESH",0,0,0,0,0,0]
+["February","PUNE D2R","GIRISH",85,94869,121,321691,6,12326]
 
 ]
 
@@ -73,7 +63,7 @@ columns = [
 
 df = pd.DataFrame(data,columns=columns)
 
-# ---------------- CALCULATIONS ----------------
+# ---------- CALCULATIONS ----------
 
 df["Total Qty"] = df["Audio Qty"] + df["Watch Qty"] + df["Accessories Qty"]
 
@@ -85,80 +75,128 @@ df["Accessories Revenue"]
 
 df["ASP"] = df["Total Revenue"] / df["Total Qty"]
 
-# ---------------- KPI ----------------
+# ---------- CATEGORY DATA ----------
 
-st.subheader("Business KPIs")
-
-c1,c2,c3 = st.columns(3)
-
-total_revenue = df["Total Revenue"].sum()
-total_units = df["Total Qty"].sum()
-asp = total_revenue / total_units
-
-c1.metric("Total Revenue",f"₹{total_revenue:,.0f}")
-c2.metric("Units Sold",int(total_units))
-c3.metric("Average Selling Price",f"₹{asp:,.0f}")
-
-st.divider()
-
-# ---------------- CATEGORY CHART ----------------
-
-cat = pd.DataFrame({
-"Category":["Audio","Watch","Accessories"],
-"Revenue":[
-df["Audio Revenue"].sum(),
-df["Watch Revenue"].sum(),
-df["Accessories Revenue"].sum()
-]
+category_df = pd.DataFrame({
+"Month": df["Month"].repeat(3).values,
+"Zone": df["Zone"].repeat(3).values,
+"Salesman": df["Salesman"].repeat(3).values,
+"Category": ["Audio","Watch","Accessories"] * len(df),
+"Qty": df[["Audio Qty","Watch Qty","Accessories Qty"]].values.flatten(),
+"Revenue": df[["Audio Revenue","Watch Revenue","Accessories Revenue"]].values.flatten()
 })
 
-fig = px.pie(cat,names="Category",values="Revenue")
+# ---------- FILTERS ----------
+
+st.sidebar.header("Filters")
+
+month_filter = st.sidebar.multiselect(
+"Month",
+category_df["Month"].unique(),
+default=category_df["Month"].unique()
+)
+
+zone_filter = st.sidebar.multiselect(
+"Zone / State",
+category_df["Zone"].unique(),
+default=category_df["Zone"].unique()
+)
+
+salesman_filter = st.sidebar.multiselect(
+"Salesman",
+category_df["Salesman"].unique(),
+default=category_df["Salesman"].unique()
+)
+
+category_filter = st.sidebar.multiselect(
+"Category",
+category_df["Category"].unique(),
+default=category_df["Category"].unique()
+)
+
+filtered = category_df[
+(category_df["Month"].isin(month_filter)) &
+(category_df["Zone"].isin(zone_filter)) &
+(category_df["Salesman"].isin(salesman_filter)) &
+(category_df["Category"].isin(category_filter))
+]
+
+# ---------- CATEGORY CHART ----------
+
+st.subheader("Category Revenue")
+
+fig = px.bar(
+filtered,
+x="Category",
+y="Revenue",
+color="Month",
+barmode="group"
+)
+
 st.plotly_chart(fig,use_container_width=True)
 
-# ---------------- SALESMAN LEADERBOARD ----------------
+# ---------- SALESMAN LEADERBOARD ----------
 
-salesman = df.groupby("Salesman")["Total Revenue"].sum().reset_index()
+st.subheader("Salesman Leaderboard")
 
-salesman = salesman.sort_values("Total Revenue",ascending=False)
+salesman_chart = filtered.groupby("Salesman")["Revenue"].sum().reset_index()
 
-fig2 = px.bar(salesman,x="Salesman",y="Total Revenue",color="Total Revenue")
+fig2 = px.bar(
+salesman_chart,
+x="Salesman",
+y="Revenue",
+color="Revenue"
+)
 
 st.plotly_chart(fig2,use_container_width=True)
 
-# ---------------- ZONE PERFORMANCE ----------------
+# ---------- ZONE PERFORMANCE ----------
 
-zone = df.groupby("Zone")["Total Revenue"].sum().reset_index()
+st.subheader("Zone Performance")
 
-fig3 = px.bar(zone,x="Zone",y="Total Revenue",color="Total Revenue")
+zone_chart = filtered.groupby("Zone")["Revenue"].sum().reset_index()
+
+fig3 = px.bar(
+zone_chart,
+x="Zone",
+y="Revenue",
+color="Revenue"
+)
 
 st.plotly_chart(fig3,use_container_width=True)
 
-# ---------------- MONTH TREND ----------------
+# ---------- FORECAST ----------
 
-month = df.groupby("Month")["Total Revenue"].sum().reset_index()
+st.subheader("Forecast")
 
-fig4 = px.line(month,x="Month",y="Total Revenue",markers=True)
+month_df = df.groupby("Month")["Total Revenue"].sum().reset_index()
 
-st.plotly_chart(fig4,use_container_width=True)
+jan = month_df.iloc[0]["Total Revenue"]
+feb = month_df.iloc[1]["Total Revenue"]
 
-# ---------------- AI INSIGHTS ----------------
+growth = (feb - jan) / jan
 
-summary = df.groupby("Salesman").agg({
-"Total Revenue":"sum",
-"Total Qty":"sum"
-}).reset_index()
+forecast = feb * (1 + growth)
+
+st.metric("Predicted March Revenue",f"₹{forecast:,.0f}")
+
+# ---------- AI INSIGHTS ----------
+
+st.subheader("AI Business Insights")
+
+summary = filtered.groupby("Salesman")["Revenue"].sum().reset_index()
 
 prompt = f"""
 Analyze this sales data:
 
 {summary.to_string()}
 
-Provide:
-1. Top salesman
-2. Weak zone
-3. Opportunity
-4. Risk
-5. Strategy
+Give insights about:
+1. Best performing salesman
+2. Weak area
+3. Risk
+4. Opportunity
+5. Strategy recommendation
 """
 
 response = client.chat.completions.create(
@@ -166,12 +204,4 @@ model="gpt-4o-mini",
 messages=[{"role":"user","content":prompt}]
 )
 
-st.subheader("AI Insights")
-
 st.write(response.choices[0].message.content)
-
-# ---------------- DATA TABLE ----------------
-
-st.subheader("Full Data")
-
-st.dataframe(df)
