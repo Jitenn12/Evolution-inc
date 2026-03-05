@@ -3,6 +3,22 @@ import pandas as pd
 import plotly.express as px
 from openai import OpenAI
 
+# -------- LOGIN SYSTEM --------
+
+users = {
+    "admin": "9326297095",
+    "analyst": "evolution123"
+}
+
+st.sidebar.title("Login")
+
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if username not in users or users[username] != password:
+    st.warning("Please login to access the dashboard")
+    st.stop()
+
 # -------------------- OPENAI --------------------
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
