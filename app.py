@@ -19,6 +19,26 @@ if username not in users or users[username] != password:
     st.warning("Please login to access the dashboard")
     st.stop()
 
+# -------- SALES DATA UPLOAD --------
+
+st.sidebar.subheader("Upload Sales Excel")
+
+uploaded_file = st.sidebar.file_uploader(
+    "Upload Excel file",
+    type=["xlsx","csv"]
+)
+
+if uploaded_file is not None:
+
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+
+else:
+    st.info("Please upload a sales Excel file to continue")
+    st.stop()
+
 # -------------------- OPENAI --------------------
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
