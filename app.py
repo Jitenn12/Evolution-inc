@@ -1,9 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import base64
 from openai import OpenAI
 
-# -------- LOGIN SYSTEM --------
+st.set_page_config(layout="wide")
+
+# ---------------- LOGIN ----------------
 
 users = {
     "admin": "9326297095",
@@ -16,119 +19,100 @@ username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
 
 if username not in users or users[username] != password:
-    st.warning("Please login to access the dashboard")
+    st.warning("Please login")
     st.stop()
 
-# -------- DATA UPLOAD --------
+# ---------------- OPENAI CLIENT ----------------
+
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+# ---------------- DATA UPLOAD ----------------
 
 st.sidebar.subheader("Upload Sales Data")
 
 uploaded_file = st.sidebar.file_uploader(
-    "Upload Excel, CSV or Image",
-    type=["xlsx", "csv", "png", "jpg", "jpeg"]
+    "Upload Excel / CSV / Image",
+    type=["xlsx","csv","png","jpg","jpeg"]
 )
+
+df = None
 
 if uploaded_file is not None:
 
     file_type = uploaded_file.name.split(".")[-1]
 
     # ---------- EXCEL ----------
-    if file_type in ["xlsx", "csv"]:
+    if file_type in ["xlsx","csv"]:
 
         if file_type == "csv":
             df = pd.read_csv(uploaded_file)
         else:
             df = pd.read_excel(uploaded_file)
 
-        st.success("Excel data loaded successfully")
-        st.dataframe(df)
+        st.success("Excel data loaded")
 
     # ---------- IMAGE ----------
     else:
 
-        from PIL import Image
-        import pytesseract
+        st.image(uploaded_file, caption="Uploaded Sales Sheet")
 
-        image = Image.open(uploaded_file)
+        image_bytes = uploaded_file.getvalue()
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-        st.image(image, caption="Uploaded Sales Sheet", use_container_width=True)
+        response = client.responses.create(
+            model="gpt-4.1-mini",
+            input=[{
+                "role":"user",
+                "content":[
+                    {"type":"input_text","text":"Extract the sales table from this image. Return CSV format."},
+                    {
+                        "type":"input_image",
+                        "image_url":f"data:image/jpeg;base64,{base64_image}"
+                    }
+                ]
+            }]
+        )
 
-        text = pytesseract.image_to_string(image)
+        extracted = response.output_text
 
-        st.subheader("Extracted Text from Image")
-        st.write(text)
+        st.subheader("Extracted Data")
+        st.write(extracted)
+
+        try:
+            from io import StringIO
+            df = pd.read_csv(StringIO(extracted))
+        except:
+            st.warning("Could not convert image to table")
 
 else:
 
-    st.info("Upload sales data (Excel or Image)")
+    st.info("Upload sales data")
     st.stop()
 
-# -------------------- OPENAI --------------------
-
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-st.set_page_config(layout="wide")
+# ---------------- DASHBOARD ----------------
 
 st.title("Evolution Inc AI Sales Intelligence")
 
-# -------------------- DATA --------------------
+# Ensure columns exist
+required = ["Month","Zone","Salesman","Audio Revenue","Watch Revenue","Accessories Revenue","Audio Qty","Watch Qty","Accessories Qty"]
 
-data = [
+missing = [c for c in required if c not in df.columns]
 
-["January","WEST-1 INDIA","FIROZ",13,33783,38,100534,0,0],
-["January","WEST-1 INDIA","GURUNATH",7228,7011402,10398,14456438,6,6990],
-["January","WEST-1 INDIA","J-CORP",20,15680,1,4750,0,0],
-["January","WEST-1 INDIA","J",5111,4730444,6389,10225496,0,0],
+if missing:
+    st.warning(f"Missing columns: {missing}")
+    st.stop()
 
-["January","WEST-2 INDIA","DINESH",3052,4479353,2690,4345648,90,175050],
-["January","WEST-2 INDIA","JULESH",2326,2846038,3654,6491939,17,19805],
-
-["January","MUMBAI D2R","AMIT",143,214900,269,489864,0,0],
-["January","MUMBAI D2R","LAXMAN",439,641900,498,1267414,1,2067],
-["January","MUMBAI D2R","NILESH",147,166844,247,408888,0,0],
-["January","MUMBAI D2R","RAKESH",229,356996,499,948731,0,0],
-["January","MUMBAI D2R","SANDEEP",417,530527,414,998770,0,0],
-["January","MUMBAI D2R","TUKARAM",134,171187,220,364287,0,0],
-
-["January","PUNE D2R","FIROZ",112,103472,567,934789,0,0],
-["January","PUNE D2R","GIRISH",192,360738,149,333707,0,0],
-
-["February","WEST-1 INDIA","FIROZ",3,12997,63,176951,0,0],
-["February","WEST-1 INDIA","GURUNATH",4922,5021419,9844,13182573,765,1487925],
-["February","WEST-1 INDIA","J-CORP",275,392490,42,49974,0,0],
-["February","WEST-1 INDIA","J",3668,3486360,3345,5527059,300,577800],
-
-["February","WEST-2 INDIA","DINESH",1308,1338016,4744,6273006,255,417975],
-["February","WEST-2 INDIA","JULESH",3068,3190321,5731,9013208,600,1151400],
-
-["February","MUMBAI D2R","AMIT",183,210327,304,471861,11,22613],
-["February","MUMBAI D2R","LAXMAN",310,412839,533,1117105,24,35749],
-["February","MUMBAI D2R","NILESH",168,198607,281,465939,13,20707],
-["February","MUMBAI D2R","RAKESH",170,217197,498,879009,24,45216],
-["February","MUMBAI D2R","SANDEEP",173,201265,398,883620,4,8132],
-["February","MUMBAI D2R","TUKARAM",270,347908,178,290851,3,6420],
-
-["February","PUNE D2R","FIROZ",85,84970,172,341024,0,0],
-["February","PUNE D2R","GIRISH",85,94869,121,321691,6,12326],
-
-]
-
-df = pd.DataFrame(data, columns=[
-"Month","Zone","Salesman",
-"Audio Qty","Audio Revenue",
-"Watch Qty","Watch Revenue",
-"Accessories Qty","Accessories Revenue"
-])
+# Totals
 
 df["Total Revenue"] = df["Audio Revenue"] + df["Watch Revenue"] + df["Accessories Revenue"]
 df["Total Qty"] = df["Audio Qty"] + df["Watch Qty"] + df["Accessories Qty"]
 
-# -------------------- FILTERS --------------------
+# ---------------- FILTERS ----------------
 
-st.sidebar.header("Filters")
+st.sidebar.subheader("Filters")
 
 month = st.sidebar.multiselect("Month",df["Month"].unique(),df["Month"].unique())
-zone = st.sidebar.multiselect("Zone / State",df["Zone"].unique(),df["Zone"].unique())
+zone = st.sidebar.multiselect("Zone",df["Zone"].unique(),df["Zone"].unique())
 salesman = st.sidebar.multiselect("Salesman",df["Salesman"].unique(),df["Salesman"].unique())
 
 filtered = df[
@@ -137,7 +121,7 @@ filtered = df[
 (df["Salesman"].isin(salesman))
 ]
 
-# -------------------- KPIs --------------------
+# ---------------- KPIs ----------------
 
 col1,col2,col3 = st.columns(3)
 
@@ -147,7 +131,7 @@ col2.metric("Units Sold",filtered["Total Qty"].sum())
 asp = int(filtered["Total Revenue"].sum()/filtered["Total Qty"].sum())
 col3.metric("Average Selling Price",f"₹{asp}")
 
-# -------------------- CATEGORY CHART --------------------
+# ---------------- CATEGORY CHART ----------------
 
 st.subheader("Category Revenue")
 
@@ -160,32 +144,37 @@ filtered["Accessories Revenue"].sum()
 ]})
 
 fig = px.bar(cat,x="Category",y="Revenue",color="Category")
+
 st.plotly_chart(fig,use_container_width=True)
 
-# -------------------- FORECAST --------------------
+# ---------------- FORECAST ----------------
 
 st.subheader("Forecast")
 
 forecast = int(filtered["Total Revenue"].sum()*1.05)
 
 st.write("Predicted Next Month Revenue")
+
 st.title(f"₹{forecast:,}")
 
-# -------------------- LEADERBOARD --------------------
+# ---------------- LEADERBOARD ----------------
 
 st.divider()
+
 st.subheader("Salesman Leaderboard")
 
 leaderboard = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
+
 leaderboard = leaderboard.sort_values("Total Revenue",ascending=False)
 
 leaderboard["Rank"] = range(1,len(leaderboard)+1)
 
 st.dataframe(leaderboard)
 
-# -------------------- ZONE HEATMAP --------------------
+# ---------------- ZONE HEATMAP ----------------
 
 st.divider()
+
 st.subheader("Zone Revenue Heatmap")
 
 heat = filtered.groupby("Zone")["Total Revenue"].sum().reset_index()
@@ -199,52 +188,10 @@ color="Total Revenue"
 
 st.plotly_chart(fig,use_container_width=True)
 
-# -------------------- ANOMALY DETECTION --------------------
+# ---------------- AI INSIGHTS ----------------
 
 st.divider()
-st.subheader("Sales Anomaly Detection")
 
-jan = df[df["Month"]=="January"].groupby("Zone")["Total Revenue"].sum()
-feb = df[df["Month"]=="February"].groupby("Zone")["Total Revenue"].sum()
-
-alerts = []
-
-for z in jan.index:
-
-    change = ((feb[z]-jan[z])/jan[z])*100
-
-    if change < -20:
-        alerts.append(f"⚠ Sales dropped {round(change,1)}% in {z}")
-
-    if change > 20:
-        alerts.append(f"🚀 Sales increased {round(change,1)}% in {z}")
-
-for a in alerts:
-    st.warning(a)
-
-# -------------------- AI SALES ALERTS --------------------
-
-st.divider()
-st.subheader("AI Sales Alerts")
-
-categories = ["Audio Revenue","Watch Revenue","Accessories Revenue"]
-
-for cat in categories:
-
-    jan_total = df[df["Month"]=="January"][cat].sum()
-    feb_total = df[df["Month"]=="February"][cat].sum()
-
-    change = ((feb_total-jan_total)/jan_total)*100
-
-    if change < -15:
-        st.warning(f"⚠ {cat.replace(' Revenue','')} dropped {round(change,1)}%")
-
-    if change > 15:
-        st.success(f"🚀 {cat.replace(' Revenue','')} grew {round(change,1)}%")
-
-# -------------------- AI BUSINESS INSIGHTS --------------------
-
-st.divider()
 st.subheader("AI Business Insights")
 
 summary = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
@@ -255,11 +202,9 @@ Analyze this sales dataset:
 {summary.to_string()}
 
 Explain:
-
-Top performer
-Weak zone
-Opportunity
-Strategy
+Top performers
+Weak zones
+Opportunities
 """
 
 try:
@@ -272,7 +217,6 @@ try:
             {"role":"system","content":"You are a sales analytics expert"},
             {"role":"user","content":prompt}
         ]
-
     )
 
     st.success(response.choices[0].message.content)
@@ -282,12 +226,13 @@ except Exception as e:
     st.warning("AI unavailable")
     st.write(e)
 
-# -------------------- ASK AI --------------------
+# ---------------- ASK AI ----------------
 
 st.divider()
+
 st.subheader("Ask AI About Sales")
 
-question = st.text_input("Ask question about your sales")
+question = st.text_input("Ask about sales")
 
 if question:
 
@@ -311,17 +256,18 @@ Question:
                 {"role":"system","content":"You are a sales analytics expert"},
                 {"role":"user","content":prompt}
             ]
-
         )
 
         st.success(response.choices[0].message.content)
 
     except:
+
         st.warning("AI unavailable")
 
-# -------------------- FULL DATA --------------------
+# ---------------- DATA TABLE ----------------
 
 st.divider()
+
 st.subheader("Full Data")
 
 st.dataframe(filtered)
