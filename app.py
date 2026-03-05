@@ -3,15 +3,15 @@ import pandas as pd
 import plotly.express as px
 from openai import OpenAI
 
-# ---------- OPENAI ----------
+# ---------------- OPENAI ----------------
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-st.set_page_config(page_title="Evolution Inc Sales Intelligence", layout="wide")
+st.set_page_config(page_title="Evolution Inc Sales Dashboard", layout="wide")
 
-st.title("Evolution Inc AI Sales Intelligence Dashboard")
+st.title("Evolution Inc AI Sales Intelligence")
 
-# ---------- DATA ----------
+# ---------------- DATA ----------------
 
 data = [
 
@@ -63,7 +63,7 @@ columns = [
 
 df = pd.DataFrame(data,columns=columns)
 
-# ---------- CALCULATIONS ----------
+# ---------------- CALCULATIONS ----------------
 
 df["Total Qty"] = df["Audio Qty"] + df["Watch Qty"] + df["Accessories Qty"]
 
@@ -75,7 +75,7 @@ df["Accessories Revenue"]
 
 df["ASP"] = df["Total Revenue"] / df["Total Qty"]
 
-# ---------- CATEGORY DATA ----------
+# ---------------- CATEGORY DATA ----------------
 
 category_df = pd.DataFrame({
 "Month": df["Month"].repeat(3).values,
@@ -86,7 +86,7 @@ category_df = pd.DataFrame({
 "Revenue": df[["Audio Revenue","Watch Revenue","Accessories Revenue"]].values.flatten()
 })
 
-# ---------- FILTERS ----------
+# ---------------- FILTERS ----------------
 
 st.sidebar.header("Filters")
 
@@ -121,7 +121,7 @@ filtered = category_df[
 (category_df["Category"].isin(category_filter))
 ]
 
-# ---------- KPI ----------
+# ---------------- KPI ----------------
 
 total_sales = filtered["Revenue"].sum()
 total_units = filtered["Qty"].sum()
@@ -137,7 +137,7 @@ k3.metric("Average Selling Price",f"₹{asp:,.0f}")
 
 st.divider()
 
-# ---------- CATEGORY CHART ----------
+# ---------------- CATEGORY CHART ----------------
 
 st.subheader("Category Revenue")
 
@@ -151,7 +151,7 @@ barmode="group"
 
 st.plotly_chart(fig,use_container_width=True)
 
-# ---------- SALESMAN LEADERBOARD ----------
+# ---------------- SALESMAN LEADERBOARD ----------------
 
 st.subheader("Salesman Leaderboard")
 
@@ -166,7 +166,7 @@ color="Revenue"
 
 st.plotly_chart(fig2,use_container_width=True)
 
-# ---------- ZONE PERFORMANCE ----------
+# ---------------- ZONE PERFORMANCE ----------------
 
 st.subheader("Zone Performance")
 
@@ -181,7 +181,7 @@ color="Revenue"
 
 st.plotly_chart(fig3,use_container_width=True)
 
-# ---------- FORECAST ----------
+# ---------------- FORECAST ----------------
 
 st.subheader("Forecast")
 
@@ -191,27 +191,26 @@ jan = month_df.iloc[0]["Total Revenue"]
 feb = month_df.iloc[1]["Total Revenue"]
 
 growth = (feb - jan) / jan
-
 forecast = feb * (1 + growth)
 
 st.metric("Predicted March Revenue",f"₹{forecast:,.0f}")
 
-# ---------- AI INSIGHTS ----------
+# ---------------- AI INSIGHTS ----------------
 
 st.subheader("AI Business Insights")
 
-summary = filtered.groupby("Salesman")["Revenue"].sum().reset_index()
+summary = filtered.groupby(["Salesman","Zone"])["Revenue"].sum().reset_index()
 
 prompt = f"""
-Analyze this sales data:
+Analyze this sales dataset and provide insights:
 
 {summary.to_string()}
 
-Give insights on:
+Explain:
 1. Top performing salesman
-2. Weak area
-3. Business risk
-4. Opportunity
+2. Weakest zone
+3. Growth opportunity
+4. Business risk
 5. Strategy recommendation
 """
 
@@ -221,12 +220,52 @@ try:
         messages=[{"role":"user","content":prompt}]
     )
 
-    st.write(response.choices[0].message.content)
+    st.success(response.choices[0].message.content)
 
 except:
     st.warning("AI insights unavailable. Check API key.")
 
-# ---------- DATA TABLE ----------
+# ---------------- ASK AI ----------------
+
+st.divider()
+st.subheader("Ask AI About Sales")
+
+question = st.text_input(
+"Ask a question about your sales data",
+placeholder="Example: Why did February revenue drop?"
+)
+
+if question:
+
+    data_context = filtered.groupby(
+        ["Month","Zone","Salesman","Category"]
+    )[["Revenue","Qty"]].sum().reset_index()
+
+    prompt = f"""
+You are a sales analytics expert.
+
+Dataset:
+{data_context.to_string()}
+
+Answer this question clearly:
+
+{question}
+"""
+
+    try:
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role":"user","content":prompt}]
+        )
+
+        st.success(response.choices[0].message.content)
+
+    except:
+
+        st.warning("AI unavailable. Check API key.")
+
+# ---------------- DATA TABLE ----------------
 
 st.subheader("Full Data")
 
