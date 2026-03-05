@@ -68,6 +68,7 @@ data = [
 
 ["February","PUNE D2R","Maharashtra","FIROZ",85,84970,172,341024,0,0],
 ["February","PUNE D2R","Maharashtra","GIRISH",85,94869,121,321691,6,12326],
+
 ]
 
 columns = [
@@ -78,6 +79,53 @@ columns = [
 ]
 
 df = pd.DataFrame(data, columns=columns)
+
+# ---------------- FILE UPLOAD ----------------
+
+st.sidebar.subheader("Upload Sales File")
+
+uploaded_file = st.sidebar.file_uploader(
+    "Upload Excel / CSV / Image",
+    type=["xlsx","csv","jpg","jpeg","png"]
+)
+
+if uploaded_file:
+
+    ext = uploaded_file.name.split(".")[-1]
+
+    if ext == "xlsx":
+        df = pd.read_excel(uploaded_file)
+
+    elif ext == "csv":
+        df = pd.read_csv(uploaded_file)
+
+    else:
+
+        st.image(uploaded_file, caption="Uploaded Image")
+
+        image_bytes = uploaded_file.getvalue()
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+        response = client.responses.create(
+            model="gpt-4.1-mini",
+            input=[{
+                "role":"user",
+                "content":[
+                    {"type":"input_text","text":"Extract the sales table and return CSV"},
+                    {"type":"input_image","image_url":f"data:image/jpeg;base64,{base64_image}"}
+                ]
+            }]
+        )
+
+        extracted = response.output_text
+
+        st.write("Extracted Table")
+        st.write(extracted)
+
+        try:
+            df = pd.read_csv(StringIO(extracted))
+        except:
+            st.warning("Image could not be converted")
 
 # ---------------- CALCULATIONS ----------------
 
@@ -97,23 +145,9 @@ df["Accessories Qty"]
 
 st.sidebar.subheader("Filters")
 
-month = st.sidebar.multiselect(
-"Month",
-df["Month"].unique(),
-df["Month"].unique()
-)
-
-zone = st.sidebar.multiselect(
-"Zone",
-df["Zone"].unique(),
-df["Zone"].unique()
-)
-
-salesman = st.sidebar.multiselect(
-"Salesman",
-df["Salesman"].unique(),
-df["Salesman"].unique()
-)
+month = st.sidebar.multiselect("Month",df["Month"].unique(),df["Month"].unique())
+zone = st.sidebar.multiselect("Zone",df["Zone"].unique(),df["Zone"].unique())
+salesman = st.sidebar.multiselect("Salesman",df["Salesman"].unique(),df["Salesman"].unique())
 
 filtered = df[
 (df["Month"].isin(month)) &
@@ -149,7 +183,6 @@ filtered["Accessories Revenue"].sum()
 ]})
 
 fig = px.bar(cat_df,x="Category",y="Revenue",color="Category")
-
 st.plotly_chart(fig,use_container_width=True)
 
 # ---------------- ZONE CHART ----------------
@@ -159,7 +192,6 @@ st.subheader("Zone Revenue")
 zone_df = filtered.groupby("Zone")["Total Revenue"].sum().reset_index()
 
 fig = px.bar(zone_df,x="Zone",y="Total Revenue")
-
 st.plotly_chart(fig,use_container_width=True)
 
 # ---------------- LEADERBOARD ----------------
@@ -167,7 +199,6 @@ st.plotly_chart(fig,use_container_width=True)
 st.subheader("Salesman Leaderboard")
 
 leader = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
-
 leader = leader.sort_values("Total Revenue",ascending=False)
 
 st.dataframe(leader)
@@ -177,7 +208,6 @@ st.dataframe(leader)
 st.subheader("Next Month Forecast")
 
 forecast = int(total_sales * 1.05)
-
 st.title(f"₹{forecast:,}")
 
 # ---------------- AI INSIGHTS ----------------
@@ -187,22 +217,20 @@ st.subheader("AI Business Insights")
 summary = leader.to_string()
 
 prompt = f"""
-Analyze this sales data:
+Analyze this sales performance:
 
 {summary}
 
 Explain
 Top performers
-Weak zones
+Weak performers
 Growth opportunities
 """
 
 try:
 
     response = client.chat.completions.create(
-
         model="gpt-4o-mini",
-
         messages=[
         {"role":"system","content":"You are a sales analytics expert"},
         {"role":"user","content":prompt}
@@ -213,7 +241,7 @@ try:
 
 except:
 
-    st.warning("AI unavailable")
+    st.warning("AI insights unavailable")
 
 # ---------------- ASK AI ----------------
 
@@ -248,7 +276,7 @@ Question:
 
         st.warning("AI unavailable")
 
-# ---------------- DATA TABLE ----------------
+# ---------------- DATA ----------------
 
 st.subheader("Full Sales Data")
 
