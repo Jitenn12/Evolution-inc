@@ -219,21 +219,6 @@ Explain:
 """
 
 try:
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a sales analytics expert."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.3
-    )
-
-    result = response.choices[0].message.content
-    st.success(result)
-
-try:
-
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -247,8 +232,7 @@ try:
     st.success(result)
 
 except Exception as e:
-
-    st.error("AI Error:")
+    st.error("AI Error")
     st.write(e)
 
 # ---------------- ASK AI ----------------
