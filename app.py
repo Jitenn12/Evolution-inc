@@ -3,6 +3,10 @@ import pandas as pd
 import plotly.express as px
 from openai import OpenAI
 
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+# DEBUG CHECK
+st.write("API Loaded:", "OPENAI_API_KEY" in st.secrets) 
 # ---------------- OPENAI ----------------
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
