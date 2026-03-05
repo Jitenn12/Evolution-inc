@@ -2,74 +2,118 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from openai import OpenAI
+import base64
+from io import StringIO
 
-# -------------------- OPENAI --------------------
+st.set_page_config(page_title="Evolution Inc Sales Intelligence", layout="wide")
+
+# ---------------- LOGIN ----------------
+
+users = {
+    "admin": "admin123",
+    "analyst": "analyst123"
+}
+
+st.sidebar.title("Login")
+
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if username not in users or users[username] != password:
+    st.warning("Login to continue")
+    st.stop()
+
+st.sidebar.success("Logged in")
+
+# ---------------- OPENAI ----------------
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-st.set_page_config(layout="wide")
-
-st.title("Evolution Inc AI Sales Intelligence")
-
-# -------------------- DATA --------------------
+# ---------------- DEFAULT SALES DATA ----------------
 
 data = [
 
-["January","WEST-1 INDIA","FIROZ",13,33783,38,100534,0,0],
-["January","WEST-1 INDIA","GURUNATH",7228,7011402,10398,14456438,6,6990],
-["January","WEST-1 INDIA","J-CORP",20,15680,1,4750,0,0],
-["January","WEST-1 INDIA","J",5111,4730444,6389,10225496,0,0],
+["January","WEST-1 INDIA","Maharashtra","FIROZ",13,33783,38,100534,0,0],
+["January","WEST-1 INDIA","Maharashtra","GURUNATH",7228,7011402,10398,14456438,6,6990],
+["January","WEST-1 INDIA","Gujarat","J-CORP",20,15680,1,4750,0,0],
+["January","WEST-1 INDIA","Gujarat","J",5111,4730444,6389,10225496,0,0],
 
-["January","WEST-2 INDIA","DINESH",3052,4479353,2690,4345648,90,175050],
-["January","WEST-2 INDIA","JULESH",2326,2846038,3654,6491939,17,19805],
+["January","WEST-2 INDIA","Gujarat","DINESH",3052,4479353,2690,4345648,90,175050],
+["January","WEST-2 INDIA","Gujarat","JULESH",2326,2846038,3654,6491939,17,19805],
 
-["January","MUMBAI D2R","AMIT",143,214900,269,489864,0,0],
-["January","MUMBAI D2R","LAXMAN",439,641900,498,1267414,1,2067],
-["January","MUMBAI D2R","NILESH",147,166844,247,408888,0,0],
-["January","MUMBAI D2R","RAKESH",229,356996,499,948731,0,0],
-["January","MUMBAI D2R","SANDEEP",417,530527,414,998770,0,0],
-["January","MUMBAI D2R","TUKARAM",134,171187,220,364287,0,0],
+["January","MUMBAI D2R","Maharashtra","AMIT",143,214900,269,489864,0,0],
+["January","MUMBAI D2R","Maharashtra","LAXMAN",439,641900,498,1267414,1,2067],
+["January","MUMBAI D2R","Maharashtra","NILESH",147,166844,247,408888,0,0],
+["January","MUMBAI D2R","Maharashtra","RAKESH",229,356996,499,948731,0,0],
+["January","MUMBAI D2R","Maharashtra","SANDEEP",417,530527,414,998770,0,0],
+["January","MUMBAI D2R","Maharashtra","TUKARAM",134,171187,220,364287,0,0],
 
-["January","PUNE D2R","FIROZ",112,103472,567,934789,0,0],
-["January","PUNE D2R","GIRISH",192,360738,149,333707,0,0],
+["January","PUNE D2R","Maharashtra","FIROZ",112,103472,567,934789,0,0],
+["January","PUNE D2R","Maharashtra","GIRISH",192,360738,149,333707,0,0],
 
-["February","WEST-1 INDIA","FIROZ",3,12997,63,176951,0,0],
-["February","WEST-1 INDIA","GURUNATH",4922,5021419,9844,13182573,765,1487925],
-["February","WEST-1 INDIA","J-CORP",275,392490,42,49974,0,0],
-["February","WEST-1 INDIA","J",3668,3486360,3345,5527059,300,577800],
+["February","WEST-1 INDIA","Maharashtra","FIROZ",3,12997,63,176951,0,0],
+["February","WEST-1 INDIA","Maharashtra","GURUNATH",4922,5021419,9844,13182573,765,1487925],
+["February","WEST-1 INDIA","Gujarat","J-CORP",275,392490,42,49974,0,0],
+["February","WEST-1 INDIA","Gujarat","J",3668,3486360,3345,5527059,300,577800],
 
-["February","WEST-2 INDIA","DINESH",1308,1338016,4744,6273006,255,417975],
-["February","WEST-2 INDIA","JULESH",3068,3190321,5731,9013208,600,1151400],
+["February","WEST-2 INDIA","Gujarat","DINESH",1308,1338016,4744,6273006,255,417975],
+["February","WEST-2 INDIA","Gujarat","JULESH",3068,3190321,5731,9013208,600,1151400],
 
-["February","MUMBAI D2R","AMIT",183,210327,304,471861,11,22613],
-["February","MUMBAI D2R","LAXMAN",310,412839,533,1117105,24,35749],
-["February","MUMBAI D2R","NILESH",168,198607,281,465939,13,20707],
-["February","MUMBAI D2R","RAKESH",170,217197,498,879009,24,45216],
-["February","MUMBAI D2R","SANDEEP",173,201265,398,883620,4,8132],
-["February","MUMBAI D2R","TUKARAM",270,347908,178,290851,3,6420],
+["February","MUMBAI D2R","Maharashtra","AMIT",183,210327,304,471861,11,22613],
+["February","MUMBAI D2R","Maharashtra","LAXMAN",310,412839,533,1117105,24,35749],
+["February","MUMBAI D2R","Maharashtra","NILESH",168,198607,281,465939,13,20707],
+["February","MUMBAI D2R","Maharashtra","RAKESH",170,217197,498,879009,24,45216],
+["February","MUMBAI D2R","Maharashtra","SANDEEP",173,201265,398,883620,4,8132],
+["February","MUMBAI D2R","Maharashtra","TUKARAM",270,347908,178,290851,3,6420],
 
-["February","PUNE D2R","FIROZ",85,84970,172,341024,0,0],
-["February","PUNE D2R","GIRISH",85,94869,121,321691,6,12326],
-
+["February","PUNE D2R","Maharashtra","FIROZ",85,84970,172,341024,0,0],
+["February","PUNE D2R","Maharashtra","GIRISH",85,94869,121,321691,6,12326],
 ]
 
-df = pd.DataFrame(data, columns=[
-"Month","Zone","Salesman",
+columns = [
+"Month","Zone","State","Salesman",
 "Audio Qty","Audio Revenue",
 "Watch Qty","Watch Revenue",
 "Accessories Qty","Accessories Revenue"
-])
+]
 
-df["Total Revenue"] = df["Audio Revenue"] + df["Watch Revenue"] + df["Accessories Revenue"]
-df["Total Qty"] = df["Audio Qty"] + df["Watch Qty"] + df["Accessories Qty"]
+df = pd.DataFrame(data, columns=columns)
 
-# -------------------- FILTERS --------------------
+# ---------------- CALCULATIONS ----------------
 
-st.sidebar.header("Filters")
+df["Total Revenue"] = (
+df["Audio Revenue"] +
+df["Watch Revenue"] +
+df["Accessories Revenue"]
+)
 
-month = st.sidebar.multiselect("Month",df["Month"].unique(),df["Month"].unique())
-zone = st.sidebar.multiselect("Zone / State",df["Zone"].unique(),df["Zone"].unique())
-salesman = st.sidebar.multiselect("Salesman",df["Salesman"].unique(),df["Salesman"].unique())
+df["Total Qty"] = (
+df["Audio Qty"] +
+df["Watch Qty"] +
+df["Accessories Qty"]
+)
+
+# ---------------- FILTERS ----------------
+
+st.sidebar.subheader("Filters")
+
+month = st.sidebar.multiselect(
+"Month",
+df["Month"].unique(),
+df["Month"].unique()
+)
+
+zone = st.sidebar.multiselect(
+"Zone",
+df["Zone"].unique(),
+df["Zone"].unique()
+)
+
+salesman = st.sidebar.multiselect(
+"Salesman",
+df["Salesman"].unique(),
+df["Salesman"].unique()
+)
 
 filtered = df[
 (df["Month"].isin(month)) &
@@ -77,21 +121,26 @@ filtered = df[
 (df["Salesman"].isin(salesman))
 ]
 
-# -------------------- KPIs --------------------
+# ---------------- KPI ----------------
+
+st.title("Evolution Inc AI Sales Intelligence")
 
 col1,col2,col3 = st.columns(3)
 
-col1.metric("Total Revenue",f"₹{filtered['Total Revenue'].sum():,}")
-col2.metric("Units Sold",filtered["Total Qty"].sum())
+total_sales = filtered["Total Revenue"].sum()
+total_units = filtered["Total Qty"].sum()
 
-asp = int(filtered["Total Revenue"].sum()/filtered["Total Qty"].sum())
+asp = int(total_sales/total_units)
+
+col1.metric("Total Revenue",f"₹{total_sales:,}")
+col2.metric("Units Sold",total_units)
 col3.metric("Average Selling Price",f"₹{asp}")
 
-# -------------------- CATEGORY CHART --------------------
+# ---------------- CATEGORY CHART ----------------
 
 st.subheader("Category Revenue")
 
-cat = pd.DataFrame({
+cat_df = pd.DataFrame({
 "Category":["Audio","Watch","Accessories"],
 "Revenue":[
 filtered["Audio Revenue"].sum(),
@@ -99,107 +148,53 @@ filtered["Watch Revenue"].sum(),
 filtered["Accessories Revenue"].sum()
 ]})
 
-fig = px.bar(cat,x="Category",y="Revenue",color="Category")
+fig = px.bar(cat_df,x="Category",y="Revenue",color="Category")
+
 st.plotly_chart(fig,use_container_width=True)
 
-# -------------------- FORECAST --------------------
+# ---------------- ZONE CHART ----------------
 
-st.subheader("Forecast")
+st.subheader("Zone Revenue")
 
-forecast = int(filtered["Total Revenue"].sum()*1.05)
+zone_df = filtered.groupby("Zone")["Total Revenue"].sum().reset_index()
 
-st.write("Predicted Next Month Revenue")
-st.title(f"₹{forecast:,}")
+fig = px.bar(zone_df,x="Zone",y="Total Revenue")
 
-# -------------------- LEADERBOARD --------------------
+st.plotly_chart(fig,use_container_width=True)
 
-st.divider()
+# ---------------- LEADERBOARD ----------------
+
 st.subheader("Salesman Leaderboard")
 
-leaderboard = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
-leaderboard = leaderboard.sort_values("Total Revenue",ascending=False)
+leader = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
 
-leaderboard["Rank"] = range(1,len(leaderboard)+1)
+leader = leader.sort_values("Total Revenue",ascending=False)
 
-st.dataframe(leaderboard)
+st.dataframe(leader)
 
-# -------------------- ZONE HEATMAP --------------------
+# ---------------- FORECAST ----------------
 
-st.divider()
-st.subheader("Zone Revenue Heatmap")
+st.subheader("Next Month Forecast")
 
-heat = filtered.groupby("Zone")["Total Revenue"].sum().reset_index()
+forecast = int(total_sales * 1.05)
 
-fig = px.treemap(
-heat,
-path=["Zone"],
-values="Total Revenue",
-color="Total Revenue"
-)
+st.title(f"₹{forecast:,}")
 
-st.plotly_chart(fig,use_container_width=True)
+# ---------------- AI INSIGHTS ----------------
 
-# -------------------- ANOMALY DETECTION --------------------
-
-st.divider()
-st.subheader("Sales Anomaly Detection")
-
-jan = df[df["Month"]=="January"].groupby("Zone")["Total Revenue"].sum()
-feb = df[df["Month"]=="February"].groupby("Zone")["Total Revenue"].sum()
-
-alerts = []
-
-for z in jan.index:
-
-    change = ((feb[z]-jan[z])/jan[z])*100
-
-    if change < -20:
-        alerts.append(f"⚠ Sales dropped {round(change,1)}% in {z}")
-
-    if change > 20:
-        alerts.append(f"🚀 Sales increased {round(change,1)}% in {z}")
-
-for a in alerts:
-    st.warning(a)
-
-# -------------------- AI SALES ALERTS --------------------
-
-st.divider()
-st.subheader("AI Sales Alerts")
-
-categories = ["Audio Revenue","Watch Revenue","Accessories Revenue"]
-
-for cat in categories:
-
-    jan_total = df[df["Month"]=="January"][cat].sum()
-    feb_total = df[df["Month"]=="February"][cat].sum()
-
-    change = ((feb_total-jan_total)/jan_total)*100
-
-    if change < -15:
-        st.warning(f"⚠ {cat.replace(' Revenue','')} dropped {round(change,1)}%")
-
-    if change > 15:
-        st.success(f"🚀 {cat.replace(' Revenue','')} grew {round(change,1)}%")
-
-# -------------------- AI BUSINESS INSIGHTS --------------------
-
-st.divider()
 st.subheader("AI Business Insights")
 
-summary = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
+summary = leader.to_string()
 
 prompt = f"""
-Analyze this sales dataset:
+Analyze this sales data:
 
-{summary.to_string()}
+{summary}
 
-Explain:
-
-Top performer
-Weak zone
-Opportunity
-Strategy
+Explain
+Top performers
+Weak zones
+Growth opportunities
 """
 
 try:
@@ -209,25 +204,22 @@ try:
         model="gpt-4o-mini",
 
         messages=[
-            {"role":"system","content":"You are a sales analytics expert"},
-            {"role":"user","content":prompt}
+        {"role":"system","content":"You are a sales analytics expert"},
+        {"role":"user","content":prompt}
         ]
-
     )
 
     st.success(response.choices[0].message.content)
 
-except Exception as e:
+except:
 
     st.warning("AI unavailable")
-    st.write(e)
 
-# -------------------- ASK AI --------------------
+# ---------------- ASK AI ----------------
 
-st.divider()
 st.subheader("Ask AI About Sales")
 
-question = st.text_input("Ask question about your sales")
+question = st.text_input("Ask question about sales")
 
 if question:
 
@@ -244,24 +236,20 @@ Question:
     try:
 
         response = client.chat.completions.create(
-
-            model="gpt-4o-mini",
-
-            messages=[
-                {"role":"system","content":"You are a sales analytics expert"},
-                {"role":"user","content":prompt}
-            ]
-
-        )
+        model="gpt-4o-mini",
+        messages=[
+        {"role":"system","content":"You are a sales analyst"},
+        {"role":"user","content":prompt}
+        ])
 
         st.success(response.choices[0].message.content)
 
     except:
+
         st.warning("AI unavailable")
 
-# -------------------- FULL DATA --------------------
+# ---------------- DATA TABLE ----------------
 
-st.divider()
-st.subheader("Full Data")
+st.subheader("Full Sales Data")
 
 st.dataframe(filtered)
