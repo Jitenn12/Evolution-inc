@@ -121,6 +121,22 @@ filtered = category_df[
 (category_df["Category"].isin(category_filter))
 ]
 
+# ---------- KPI ----------
+
+total_sales = filtered["Revenue"].sum()
+total_units = filtered["Qty"].sum()
+asp = total_sales / total_units if total_units else 0
+
+st.header(f"Total Sales ₹{total_sales:,.0f}")
+
+k1,k2,k3 = st.columns(3)
+
+k1.metric("Total Revenue",f"₹{total_sales:,.0f}")
+k2.metric("Units Sold",int(total_units))
+k3.metric("Average Selling Price",f"₹{asp:,.0f}")
+
+st.divider()
+
 # ---------- CATEGORY CHART ----------
 
 st.subheader("Category Revenue")
@@ -191,17 +207,27 @@ Analyze this sales data:
 
 {summary.to_string()}
 
-Give insights about:
-1. Best performing salesman
+Give insights on:
+1. Top performing salesman
 2. Weak area
-3. Risk
+3. Business risk
 4. Opportunity
 5. Strategy recommendation
 """
 
-response = client.chat.completions.create(
-model="gpt-4o-mini",
-messages=[{"role":"user","content":prompt}]
-)
+try:
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role":"user","content":prompt}]
+    )
 
-st.write(response.choices[0].message.content)
+    st.write(response.choices[0].message.content)
+
+except:
+    st.warning("AI insights unavailable. Check API key.")
+
+# ---------- DATA TABLE ----------
+
+st.subheader("Full Data")
+
+st.dataframe(df)
