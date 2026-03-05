@@ -85,4 +85,4 @@ if uploaded_file:
     category_data = {
         "Category":["Watches","Audio","Accessories"],
         "Units":[
-            df[" 
+            df["Month"] = df["Date"].dt.to_period("M") 
