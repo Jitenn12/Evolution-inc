@@ -3,19 +3,15 @@ import pandas as pd
 import plotly.express as px
 from openai import OpenAI
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-# DEBUG CHECK
-st.write("API Loaded:", "OPENAI_API_KEY" in st.secrets) 
-# ---------------- OPENAI ----------------
+# -------------------- OPENAI --------------------
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-st.set_page_config(page_title="Evolution Inc Sales Dashboard", layout="wide")
+st.set_page_config(layout="wide")
 
 st.title("Evolution Inc AI Sales Intelligence")
 
-# ---------------- DATA ----------------
+# -------------------- DATA --------------------
 
 data = [
 
@@ -28,12 +24,11 @@ data = [
 ["January","WEST-2 INDIA","JULESH",2326,2846038,3654,6491939,17,19805],
 
 ["January","MUMBAI D2R","AMIT",143,214900,269,489864,0,0],
-["January","MUMBAI D2R","LAXMAN",439,641890,498,1267414,1,2067],
+["January","MUMBAI D2R","LAXMAN",439,641900,498,1267414,1,2067],
 ["January","MUMBAI D2R","NILESH",147,166844,247,408888,0,0],
 ["January","MUMBAI D2R","RAKESH",229,356996,499,948731,0,0],
 ["January","MUMBAI D2R","SANDEEP",417,530527,414,998770,0,0],
 ["January","MUMBAI D2R","TUKARAM",134,171187,220,364287,0,0],
-["January","MUMBAI D2R","KALPESH",2,2109,0,0,0,0],
 
 ["January","PUNE D2R","FIROZ",112,103472,567,934789,0,0],
 ["January","PUNE D2R","GIRISH",192,360738,149,333707,0,0],
@@ -54,210 +49,194 @@ data = [
 ["February","MUMBAI D2R","TUKARAM",270,347908,178,290851,3,6420],
 
 ["February","PUNE D2R","FIROZ",85,84970,172,341024,0,0],
-["February","PUNE D2R","GIRISH",85,94869,121,321691,6,12326]
+["February","PUNE D2R","GIRISH",85,94869,121,321691,6,12326],
 
 ]
 
-columns = [
+df = pd.DataFrame(data, columns=[
 "Month","Zone","Salesman",
 "Audio Qty","Audio Revenue",
 "Watch Qty","Watch Revenue",
 "Accessories Qty","Accessories Revenue"
-]
+])
 
-df = pd.DataFrame(data,columns=columns)
-
-# ---------------- CALCULATIONS ----------------
-
+df["Total Revenue"] = df["Audio Revenue"] + df["Watch Revenue"] + df["Accessories Revenue"]
 df["Total Qty"] = df["Audio Qty"] + df["Watch Qty"] + df["Accessories Qty"]
 
-df["Total Revenue"] = (
-df["Audio Revenue"] +
-df["Watch Revenue"] +
-df["Accessories Revenue"]
-)
-
-df["ASP"] = df["Total Revenue"] / df["Total Qty"]
-
-# ---------------- CATEGORY DATA ----------------
-
-category_df = pd.DataFrame({
-"Month": df["Month"].repeat(3).values,
-"Zone": df["Zone"].repeat(3).values,
-"Salesman": df["Salesman"].repeat(3).values,
-"Category": ["Audio","Watch","Accessories"] * len(df),
-"Qty": df[["Audio Qty","Watch Qty","Accessories Qty"]].values.flatten(),
-"Revenue": df[["Audio Revenue","Watch Revenue","Accessories Revenue"]].values.flatten()
-})
-
-# ---------------- FILTERS ----------------
+# -------------------- FILTERS --------------------
 
 st.sidebar.header("Filters")
 
-month_filter = st.sidebar.multiselect(
-"Month",
-category_df["Month"].unique(),
-default=category_df["Month"].unique()
-)
+month = st.sidebar.multiselect("Month",df["Month"].unique(),df["Month"].unique())
+zone = st.sidebar.multiselect("Zone / State",df["Zone"].unique(),df["Zone"].unique())
+salesman = st.sidebar.multiselect("Salesman",df["Salesman"].unique(),df["Salesman"].unique())
 
-zone_filter = st.sidebar.multiselect(
-"Zone / State",
-category_df["Zone"].unique(),
-default=category_df["Zone"].unique()
-)
-
-salesman_filter = st.sidebar.multiselect(
-"Salesman",
-category_df["Salesman"].unique(),
-default=category_df["Salesman"].unique()
-)
-
-category_filter = st.sidebar.multiselect(
-"Category",
-category_df["Category"].unique(),
-default=category_df["Category"].unique()
-)
-
-filtered = category_df[
-(category_df["Month"].isin(month_filter)) &
-(category_df["Zone"].isin(zone_filter)) &
-(category_df["Salesman"].isin(salesman_filter)) &
-(category_df["Category"].isin(category_filter))
+filtered = df[
+(df["Month"].isin(month)) &
+(df["Zone"].isin(zone)) &
+(df["Salesman"].isin(salesman))
 ]
 
-# ---------------- KPI ----------------
+# -------------------- KPIs --------------------
 
-total_sales = filtered["Revenue"].sum()
-total_units = filtered["Qty"].sum()
-asp = total_sales / total_units if total_units else 0
+col1,col2,col3 = st.columns(3)
 
-st.header(f"Total Sales ₹{total_sales:,.0f}")
+col1.metric("Total Revenue",f"₹{filtered['Total Revenue'].sum():,}")
+col2.metric("Units Sold",filtered["Total Qty"].sum())
 
-k1,k2,k3 = st.columns(3)
+asp = int(filtered["Total Revenue"].sum()/filtered["Total Qty"].sum())
+col3.metric("Average Selling Price",f"₹{asp}")
 
-k1.metric("Total Revenue",f"₹{total_sales:,.0f}")
-k2.metric("Units Sold",int(total_units))
-k3.metric("Average Selling Price",f"₹{asp:,.0f}")
-
-st.divider()
-
-# ---------------- CATEGORY CHART ----------------
+# -------------------- CATEGORY CHART --------------------
 
 st.subheader("Category Revenue")
 
-fig = px.bar(
-filtered,
-x="Category",
-y="Revenue",
-color="Month",
-barmode="group"
+cat = pd.DataFrame({
+"Category":["Audio","Watch","Accessories"],
+"Revenue":[
+filtered["Audio Revenue"].sum(),
+filtered["Watch Revenue"].sum(),
+filtered["Accessories Revenue"].sum()
+]})
+
+fig = px.bar(cat,x="Category",y="Revenue",color="Category")
+st.plotly_chart(fig,use_container_width=True)
+
+# -------------------- FORECAST --------------------
+
+st.subheader("Forecast")
+
+forecast = int(filtered["Total Revenue"].sum()*1.05)
+
+st.write("Predicted Next Month Revenue")
+st.title(f"₹{forecast:,}")
+
+# -------------------- LEADERBOARD --------------------
+
+st.divider()
+st.subheader("Salesman Leaderboard")
+
+leaderboard = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
+leaderboard = leaderboard.sort_values("Total Revenue",ascending=False)
+
+leaderboard["Rank"] = range(1,len(leaderboard)+1)
+
+st.dataframe(leaderboard)
+
+# -------------------- ZONE HEATMAP --------------------
+
+st.divider()
+st.subheader("Zone Revenue Heatmap")
+
+heat = filtered.groupby("Zone")["Total Revenue"].sum().reset_index()
+
+fig = px.treemap(
+heat,
+path=["Zone"],
+values="Total Revenue",
+color="Total Revenue"
 )
 
 st.plotly_chart(fig,use_container_width=True)
 
-# ---------------- SALESMAN LEADERBOARD ----------------
+# -------------------- ANOMALY DETECTION --------------------
 
-st.subheader("Salesman Leaderboard")
+st.divider()
+st.subheader("Sales Anomaly Detection")
 
-salesman_chart = filtered.groupby("Salesman")["Revenue"].sum().reset_index()
+jan = df[df["Month"]=="January"].groupby("Zone")["Total Revenue"].sum()
+feb = df[df["Month"]=="February"].groupby("Zone")["Total Revenue"].sum()
 
-fig2 = px.bar(
-salesman_chart,
-x="Salesman",
-y="Revenue",
-color="Revenue"
-)
+alerts = []
 
-st.plotly_chart(fig2,use_container_width=True)
+for z in jan.index:
 
-# ---------------- ZONE PERFORMANCE ----------------
+    change = ((feb[z]-jan[z])/jan[z])*100
 
-st.subheader("Zone Performance")
+    if change < -20:
+        alerts.append(f"⚠ Sales dropped {round(change,1)}% in {z}")
 
-zone_chart = filtered.groupby("Zone")["Revenue"].sum().reset_index()
+    if change > 20:
+        alerts.append(f"🚀 Sales increased {round(change,1)}% in {z}")
 
-fig3 = px.bar(
-zone_chart,
-x="Zone",
-y="Revenue",
-color="Revenue"
-)
+for a in alerts:
+    st.warning(a)
 
-st.plotly_chart(fig3,use_container_width=True)
+# -------------------- AI SALES ALERTS --------------------
 
-# ---------------- FORECAST ----------------
+st.divider()
+st.subheader("AI Sales Alerts")
 
-st.subheader("Forecast")
+categories = ["Audio Revenue","Watch Revenue","Accessories Revenue"]
 
-month_df = df.groupby("Month")["Total Revenue"].sum().reset_index()
+for cat in categories:
 
-jan = month_df.iloc[0]["Total Revenue"]
-feb = month_df.iloc[1]["Total Revenue"]
+    jan_total = df[df["Month"]=="January"][cat].sum()
+    feb_total = df[df["Month"]=="February"][cat].sum()
 
-growth = (feb - jan) / jan
-forecast = feb * (1 + growth)
+    change = ((feb_total-jan_total)/jan_total)*100
 
-st.metric("Predicted March Revenue",f"₹{forecast:,.0f}")
+    if change < -15:
+        st.warning(f"⚠ {cat.replace(' Revenue','')} dropped {round(change,1)}%")
 
-# ---------------- AI INSIGHTS ----------------
+    if change > 15:
+        st.success(f"🚀 {cat.replace(' Revenue','')} grew {round(change,1)}%")
 
+# -------------------- AI BUSINESS INSIGHTS --------------------
+
+st.divider()
 st.subheader("AI Business Insights")
 
-summary = filtered.groupby(["Salesman","Zone"])["Revenue"].sum().reset_index()
+summary = filtered.groupby("Salesman")["Total Revenue"].sum().reset_index()
 
 prompt = f"""
-Analyze this sales dataset and provide insights:
+Analyze this sales dataset:
 
 {summary.to_string()}
 
 Explain:
-1. Top performing salesman
-2. Weakest zone
-3. Growth opportunity
-4. Business risk
-5. Strategy recommendation
+
+Top performer
+Weak zone
+Opportunity
+Strategy
 """
 
 try:
+
     response = client.chat.completions.create(
+
         model="gpt-4o-mini",
+
         messages=[
-            {"role": "system", "content": "You are a sales analytics expert."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.3
+            {"role":"system","content":"You are a sales analytics expert"},
+            {"role":"user","content":prompt}
+        ]
+
     )
 
-    result = response.choices[0].message.content
-    st.success(result)
+    st.success(response.choices[0].message.content)
 
 except Exception as e:
-    st.error("AI Error")
+
+    st.warning("AI unavailable")
     st.write(e)
 
-# ---------------- ASK AI ----------------
+# -------------------- ASK AI --------------------
 
 st.divider()
 st.subheader("Ask AI About Sales")
 
-question = st.text_input(
-"Ask a question about your sales data",
-placeholder="Example: Why did February revenue drop?"
-)
+question = st.text_input("Ask question about your sales")
 
 if question:
 
-    data_context = filtered.groupby(
-        ["Month","Zone","Salesman","Category"]
-    )[["Revenue","Qty"]].sum().reset_index()
-
     prompt = f"""
-You are a sales analytics expert.
+Sales data:
 
-Dataset:
-{data_context.to_string()}
+{filtered.to_string()}
 
-Answer this question clearly:
+Question:
 
 {question}
 """
@@ -265,18 +244,24 @@ Answer this question clearly:
     try:
 
         response = client.chat.completions.create(
+
             model="gpt-4o-mini",
-            messages=[{"role":"user","content":prompt}]
+
+            messages=[
+                {"role":"system","content":"You are a sales analytics expert"},
+                {"role":"user","content":prompt}
+            ]
+
         )
 
         st.success(response.choices[0].message.content)
 
     except:
+        st.warning("AI unavailable")
 
-        st.warning("AI unavailable. Check API key.")
+# -------------------- FULL DATA --------------------
 
-# ---------------- DATA TABLE ----------------
-
+st.divider()
 st.subheader("Full Data")
 
-st.dataframe(df)
+st.dataframe(filtered)
