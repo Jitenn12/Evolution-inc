@@ -175,4 +175,4 @@ st.write(insights)
 
 st.subheader("Detailed Data")
 
-st.dataframe(df)is 
+st.dataframe(df)
