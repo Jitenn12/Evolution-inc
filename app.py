@@ -34,117 +34,66 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 st.sidebar.subheader("Upload Sales File")
 
 uploaded_file = st.sidebar.file_uploader(
-    "Upload Excel / CSV / Image",
-    type=["xlsx","csv","jpg","jpeg","png"]
+    "Upload Excel / CSV",
+    type=["xlsx","csv"]
 )
 
-df = None
-
-if uploaded_file:
-
-    ext = uploaded_file.name.split(".")[-1]
-
-    # ---------- EXCEL ----------
-    if ext in ["xlsx","csv"]:
-
-        if ext == "xlsx":
-            df = pd.read_excel(uploaded_file)
-        else:
-            df = pd.read_csv(uploaded_file)
-
-        df.columns = df.columns.str.strip()
-
-        # -------- SMART COLUMN DETECTION --------
-
-        for col in df.columns:
-
-            c = col.lower()
-
-            if "audio" in c and ("value" in c or "revenue" in c or "sales" in c):
-                df.rename(columns={col:"Audio Revenue"}, inplace=True)
-
-            if "watch" in c and ("value" in c or "revenue" in c or "sales" in c):
-                df.rename(columns={col:"Watch Revenue"}, inplace=True)
-
-            if "access" in c and ("value" in c or "revenue" in c or "sales" in c):
-                df.rename(columns={col:"Accessories Revenue"}, inplace=True)
-
-            if "audio" in c and ("qty" in c or "unit" in c):
-                df.rename(columns={col:"Audio Qty"}, inplace=True)
-
-            if "watch" in c and ("qty" in c or "unit" in c):
-                df.rename(columns={col:"Watch Qty"}, inplace=True)
-
-            if "access" in c and ("qty" in c or "unit" in c):
-                df.rename(columns={col:"Accessories Qty"}, inplace=True)
-
-    # ---------- IMAGE ----------
-    else:
-
-        st.image(uploaded_file)
-
-        image_bytes = uploaded_file.getvalue()
-        base64_image = base64.b64encode(image_bytes).decode("utf-8")
-
-        response = client.responses.create(
-            model="gpt-4.1-mini",
-            input=[{
-                "role":"user",
-                "content":[
-                    {"type":"input_text",
-                     "text":"Extract this sales table and return CSV"},
-                    {
-                        "type":"input_image",
-                        "image_url":f"data:image/jpeg;base64,{base64_image}"
-                    }
-                ]
-            }]
-        )
-
-        extracted = response.output_text
-
-        st.write(extracted)
-
-        try:
-            df = pd.read_csv(StringIO(extracted))
-        except:
-            st.error("Could not convert image")
-
-# ---------------- DATA CHECK ----------------
-
-if df is None:
-    st.info("Upload a sales file to begin")
+if uploaded_file is None:
+    st.info("Upload your Sales Register Excel")
     st.stop()
 
+# ---------------- READ FILE ----------------
+
+if uploaded_file.name.endswith("xlsx"):
+    df = pd.read_excel(uploaded_file)
+else:
+    df = pd.read_csv(uploaded_file)
+
+df.columns = df.columns.str.strip()
+
+# ---------------- REQUIRED COLUMNS ----------------
+
 required = [
-"Audio Revenue",
-"Watch Revenue",
-"Accessories Revenue",
-"Audio Qty",
-"Watch Qty",
-"Accessories Qty"
+"Month",
+"Type",
+"Quantity",
+"Value",
+"Salesman",
+"State",
+"Zone"
 ]
 
 missing = [c for c in required if c not in df.columns]
 
 if missing:
     st.error(f"Missing columns: {missing}")
-    st.write("Detected columns:", df.columns)
     st.stop()
 
-# ---------------- CALCULATIONS ----------------
+# ---------------- CLEAN DATA ----------------
 
-df["Total Revenue"] = (
-df["Audio Revenue"] +
-df["Watch Revenue"] +
-df["Accessories Revenue"]
-)
+df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
+df["Value"] = pd.to_numeric(df["Value"], errors="coerce").fillna(0)
 
-df["Total Qty"] = (
-df["Audio Qty"] +
-df["Watch Qty"] +
-df["Accessories Qty"]
-)
+# ---------------- CATEGORY SPLIT ----------------
+
+audio = df[df["Type"].str.contains("audio", case=False, na=False)]
+watch = df[df["Type"].str.contains("watch", case=False, na=False)]
+accessories = df[df["Type"].str.contains("access", case=False, na=False)]
+
+# ---------------- TOTALS ----------------
+
+audio_rev = audio["Value"].sum()
+watch_rev = watch["Value"].sum()
+acc_rev = accessories["Value"].sum()
+
+audio_qty = audio["Quantity"].sum()
+watch_qty = watch["Quantity"].sum()
+acc_qty = accessories["Quantity"].sum()
+
+total_sales = df["Value"].sum()
+total_units = df["Quantity"].sum()
+
+asp = int(total_sales/total_units) if total_units>0 else 0
 
 # ---------------- DASHBOARD ----------------
 
@@ -152,12 +101,8 @@ st.title("Evolution Inc AI Sales Intelligence")
 
 col1,col2,col3 = st.columns(3)
 
-total_sales = df["Total Revenue"].sum()
-total_units = df["Total Qty"].sum()
-asp = int(total_sales/total_units)
-
-col1.metric("Total Revenue",f"₹{total_sales:,}")
-col2.metric("Units Sold",total_units)
+col1.metric("Total Revenue",f"₹{total_sales:,.0f}")
+col2.metric("Units Sold",int(total_units))
 col3.metric("Average Selling Price",f"₹{asp}")
 
 # ---------------- CATEGORY CHART ----------------
@@ -166,15 +111,42 @@ st.subheader("Category Revenue")
 
 cat_df = pd.DataFrame({
 "Category":["Audio","Watch","Accessories"],
-"Revenue":[
-df["Audio Revenue"].sum(),
-df["Watch Revenue"].sum(),
-df["Accessories Revenue"].sum()
-]})
+"Revenue":[audio_rev,watch_rev,acc_rev]
+})
 
 fig = px.bar(cat_df,x="Category",y="Revenue",color="Category")
 
 st.plotly_chart(fig,use_container_width=True)
+
+# ---------------- ZONE SALES ----------------
+
+st.subheader("Zone Performance")
+
+zone_df = df.groupby("Zone")["Value"].sum().reset_index()
+
+fig = px.bar(zone_df,x="Zone",y="Value",color="Value")
+
+st.plotly_chart(fig,use_container_width=True)
+
+# ---------------- STATE SALES ----------------
+
+st.subheader("State Sales")
+
+state_df = df.groupby("State")["Value"].sum().reset_index()
+
+fig = px.bar(state_df,x="State",y="Value")
+
+st.plotly_chart(fig,use_container_width=True)
+
+# ---------------- SALESMAN LEADERBOARD ----------------
+
+st.subheader("Salesman Leaderboard")
+
+leader = df.groupby("Salesman")["Value"].sum().reset_index()
+
+leader = leader.sort_values("Value",ascending=False)
+
+st.dataframe(leader)
 
 # ---------------- FORECAST ----------------
 
@@ -182,10 +154,78 @@ st.subheader("Next Month Forecast")
 
 forecast = int(total_sales * 1.05)
 
-st.title(f"₹{forecast:,}")
+st.title(f"₹{forecast:,.0f}")
 
-# ---------------- DATA ----------------
+# ---------------- AI INSIGHTS ----------------
 
-st.subheader("Sales Data")
+st.subheader("AI Business Insights")
+
+summary = leader.to_string()
+
+prompt = f"""
+Analyze this sales performance:
+
+{summary}
+
+Explain
+Top performers
+Weak performers
+Sales opportunities
+"""
+
+try:
+
+    response = client.chat.completions.create(
+
+        model="gpt-4o-mini",
+
+        messages=[
+        {"role":"system","content":"You are a sales analytics expert"},
+        {"role":"user","content":prompt}
+        ]
+    )
+
+    st.success(response.choices[0].message.content)
+
+except:
+
+    st.warning("AI insights unavailable")
+
+# ---------------- ASK AI ----------------
+
+st.subheader("Ask AI About Sales")
+
+question = st.text_input("Ask a question about your sales")
+
+if question:
+
+    prompt = f"""
+Sales dataset:
+
+{df.to_string()}
+
+Question:
+
+{question}
+"""
+
+    try:
+
+        response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+        {"role":"system","content":"You are a sales analyst"},
+        {"role":"user","content":prompt}
+        ])
+
+        st.success(response.choices[0].message.content)
+
+    except:
+
+        st.warning("AI unavailable")
+
+# ---------------- DATA TABLE ----------------
+
+st.subheader("Full Sales Register")
 
 st.dataframe(df)
