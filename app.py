@@ -219,15 +219,37 @@ Explain:
 """
 
 try:
+
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role":"user","content":prompt}]
+        messages=[
+            {"role": "system", "content": "You are a sales analytics expert."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3
     )
 
-    st.success(response.choices[0].message.content)
+    result = response.choices[0].message.content
+    st.success(result)
 
-except:
-    st.warning("AI insights unavailable. Check API key.")
+try:
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a sales analytics expert."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3
+    )
+
+    result = response.choices[0].message.content
+    st.success(result)
+
+except Exception as e:
+
+    st.error("AI Error:")
+    st.write(e)
 
 # ---------------- ASK AI ----------------
 
