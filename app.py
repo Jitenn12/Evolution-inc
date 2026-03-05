@@ -19,24 +19,48 @@ if username not in users or users[username] != password:
     st.warning("Please login to access the dashboard")
     st.stop()
 
-# -------- SALES DATA UPLOAD --------
+# -------- DATA UPLOAD --------
 
-st.sidebar.subheader("Upload Sales Excel")
+st.sidebar.subheader("Upload Sales Data")
 
 uploaded_file = st.sidebar.file_uploader(
-    "Upload Excel file",
-    type=["xlsx","csv"]
+    "Upload Excel, CSV or Image",
+    type=["xlsx", "csv", "png", "jpg", "jpeg"]
 )
 
 if uploaded_file is not None:
 
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
+    file_type = uploaded_file.name.split(".")[-1]
+
+    # ---------- EXCEL ----------
+    if file_type in ["xlsx", "csv"]:
+
+        if file_type == "csv":
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
+
+        st.success("Excel data loaded successfully")
+        st.dataframe(df)
+
+    # ---------- IMAGE ----------
     else:
-        df = pd.read_excel(uploaded_file)
+
+        from PIL import Image
+        import pytesseract
+
+        image = Image.open(uploaded_file)
+
+        st.image(image, caption="Uploaded Sales Sheet", use_container_width=True)
+
+        text = pytesseract.image_to_string(image)
+
+        st.subheader("Extracted Text from Image")
+        st.write(text)
 
 else:
-    st.info("Please upload a sales Excel file to continue")
+
+    st.info("Upload sales data (Excel or Image)")
     st.stop()
 
 # -------------------- OPENAI --------------------
