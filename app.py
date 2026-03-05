@@ -1,107 +1,178 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import openai
 
-st.set_page_config(page_title="Evolution Inc Dashboard", layout="wide")
+st.set_page_config(page_title="Evolution Inc Sales Intelligence", layout="wide")
 
-st.title("Evolution Inc Sales Intelligence Dashboard")
+st.title("Evolution Inc AI Sales Intelligence Dashboard")
 
-uploaded_file = st.file_uploader("Upload Sales Excel File", type=["xlsx"])
+# ---------------- OPENAI ----------------
 
-if uploaded_file:
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-    df = pd.read_excel(uploaded_file)
+# ---------------- SALES DATA ----------------
 
-    # Convert Date
-    df["Date"] = pd.to_datetime(df["Date"])
+data = [
+["January","WEST-1 INDIA","FIROZ",13,33783,38,100534,0,0],
+["January","WEST-1 INDIA","GURUNATH",7228,7011402,10398,14456438,6,6990],
+["January","WEST-1 INDIA","J",20,15680,6389,10225496,0,0],
+["January","WEST-1 INDIA","DINESH",3228,3625520,5281,6913477,18,27506],
 
-    # Total quantity
-    df["TotalQty"] = df["Watches"] + df["Audio"] + df["Accessories"]
+["February","WEST-1 INDIA","FIROZ",8,19614,30,73094,0,0],
+["February","WEST-1 INDIA","GURUNATH",5445,5427465,9844,13182573,46,81979],
+["February","WEST-1 INDIA","J",6,6078,6466,9585150,0,0],
+["February","WEST-1 INDIA","DINESH",2413,2556662,4813,5472335,65,102099],
+]
 
-    # Unit price
-    df["UnitPrice"] = df["Amount"] / df["TotalQty"]
+columns = [
+"Month","Zone","Salesman",
+"Audio Qty","Audio Revenue",
+"Watch Qty","Watch Revenue",
+"Accessories Qty","Accessories Revenue"
+]
 
-    # Revenue allocation
-    df["WatchRevenue"] = df["Watches"] * df["UnitPrice"]
-    df["AudioRevenue"] = df["Audio"] * df["UnitPrice"]
-    df["AccessoriesRevenue"] = df["Accessories"] * df["UnitPrice"]
+df = pd.DataFrame(data,columns=columns)
 
-    # Top metrics
-    total_sales = df["Amount"].sum()
-    total_units = df["TotalQty"].sum()
-    overall_asp = total_sales / total_units
+# ---------------- TOTAL CALCULATIONS ----------------
 
-    col1, col2, col3 = st.columns(3)
+df["Total Qty"] = df["Audio Qty"] + df["Watch Qty"] + df["Accessories Qty"]
 
-    col1.metric("Total Sales", f"₹{total_sales:,.0f}")
-    col2.metric("Total Units", int(total_units))
-    col3.metric("Overall ASP", f"₹{overall_asp:,.0f}")
+df["Total Revenue"] = (
+df["Audio Revenue"] +
+df["Watch Revenue"] +
+df["Accessories Revenue"]
+)
 
-    st.divider()
+df["ASP"] = df["Total Revenue"] / df["Total Qty"]
 
-    # ASP by category
-    watch_asp = df["WatchRevenue"].sum() / df["Watches"].sum()
-    audio_asp = df["AudioRevenue"].sum() / df["Audio"].sum()
-    accessories_asp = df["AccessoriesRevenue"].sum() / df["Accessories"].sum()
+# ---------------- KPI ----------------
 
-    st.subheader("Average Selling Price by Category")
+st.subheader("Business KPIs")
 
-    c1, c2, c3 = st.columns(3)
+c1,c2,c3 = st.columns(3)
 
-    c1.metric("Watches ASP", f"₹{watch_asp:,.0f}")
-    c2.metric("Audio ASP", f"₹{audio_asp:,.0f}")
-    c3.metric("Accessories ASP", f"₹{accessories_asp:,.0f}")
+total_revenue = df["Total Revenue"].sum()
+total_units = df["Total Qty"].sum()
+asp = total_revenue / total_units
 
-    st.divider()
+c1.metric("Total Revenue",f"₹{total_revenue:,.0f}")
+c2.metric("Units Sold",int(total_units))
+c3.metric("Average Selling Price",f"₹{asp:,.0f}")
 
-    # Dealer analytics
-    st.subheader("Dealer Analytics")
+st.divider()
 
-    dealer_sales = df.groupby("Dealer").agg({
-        "Amount": "sum",
-        "TotalQty": "sum"
-    }).reset_index()
+# ---------------- CATEGORY ANALYSIS ----------------
 
-    dealer_sales["ASP"] = dealer_sales["Amount"] / dealer_sales["TotalQty"]
+st.subheader("Category Revenue")
 
-    fig1 = px.bar(
-        dealer_sales.sort_values("Amount", ascending=False),
-        x="Dealer",
-        y="Amount",
-        color="Amount",
-        title="Dealer Revenue"
-    )
+category_df = pd.DataFrame({
+"Category":["Audio","Watch","Accessories"],
+"Revenue":[
+df["Audio Revenue"].sum(),
+df["Watch Revenue"].sum(),
+df["Accessories Revenue"].sum()
+]
+})
 
-    st.plotly_chart(fig1, use_container_width=True)
+fig = px.pie(category_df,names="Category",values="Revenue")
 
-    st.dataframe(dealer_sales.sort_values("Amount", ascending=False))
+st.plotly_chart(fig,use_container_width=True)
 
-    st.divider()
+# ---------------- SALESMAN LEADERBOARD ----------------
 
-    # Category performance
-    st.subheader("Category Performance")
+st.subheader("Salesman Leaderboard")
 
-    category_data = {
-        "Category": ["Watches", "Audio", "Accessories"],
-        "Units": [
-            df["Watches"].sum(),
-            df["Audio"].sum(),
-            df["Accessories"].sum()
-        ]
-    }
+salesman_df = df.groupby("Salesman").agg({
+"Total Revenue":"sum",
+"Total Qty":"sum"
+}).reset_index()
 
-    cat_df = pd.DataFrame(category_data)
+salesman_df["ASP"] = salesman_df["Total Revenue"] / salesman_df["Total Qty"]
 
-    fig2 = px.pie(cat_df, names="Category", values="Units")
+salesman_df = salesman_df.sort_values("Total Revenue",ascending=False)
 
-    st.plotly_chart(fig2, use_container_width=True)
+fig2 = px.bar(
+salesman_df,
+x="Salesman",
+y="Total Revenue",
+color="Total Revenue",
+title="Salesman Revenue Ranking"
+)
 
-    st.divider()
+st.plotly_chart(fig2,use_container_width=True)
 
-    # Region analytics
-    st.subheader("Region Performance")
+st.dataframe(salesman_df)
 
-    region_sales = df.groupby("Region")["Amount"].sum().reset_index()
+# ---------------- ZONE PERFORMANCE ----------------
 
-    fig3 = px.bar(
-        region_sales,
+st.subheader("Zone Performance")
+
+zone_df = df.groupby("Zone")["Total Revenue"].sum().reset_index()
+
+fig3 = px.bar(zone_df,x="Zone",y="Total Revenue",color="Total Revenue")
+
+st.plotly_chart(fig3,use_container_width=True)
+
+# ---------------- MONTHLY TREND ----------------
+
+st.subheader("Monthly Revenue Trend")
+
+month_df = df.groupby("Month")["Total Revenue"].sum().reset_index()
+
+fig4 = px.line(month_df,x="Month",y="Total Revenue",markers=True)
+
+st.plotly_chart(fig4,use_container_width=True)
+
+# ---------------- SALES FORECAST ----------------
+
+st.subheader("Forecast (Next Month)")
+
+jan = month_df.loc[month_df["Month"]=="January","Total Revenue"].values[0]
+feb = month_df.loc[month_df["Month"]=="February","Total Revenue"].values[0]
+
+growth = (feb - jan) / jan
+
+forecast = feb * (1 + growth)
+
+st.metric("Predicted March Revenue",f"₹{forecast:,.0f}")
+
+# ---------------- AI INSIGHTS ----------------
+
+st.subheader("AI Business Insights")
+
+summary = df.groupby("Salesman").agg({
+"Total Revenue":"sum",
+"Total Qty":"sum"
+}).reset_index()
+
+prompt = f"""
+You are a business sales analyst.
+
+Analyze the following data:
+
+{summary.to_string()}
+
+Provide:
+
+1. Best performing salesman
+2. Weak performance
+3. Sales risk
+4. Growth opportunity
+5. Business recommendation
+"""
+
+response = openai.ChatCompletion.create(
+model="gpt-4o-mini",
+messages=[{"role":"user","content":prompt}]
+)
+
+insights = response["choices"][0]["message"]["content"]
+
+st.write(insights)
+
+# ---------------- DATA TABLE ----------------
+
+st.subheader("Detailed Data")
+
+st.dataframe(df)is 
