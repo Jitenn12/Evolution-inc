@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import numpy as np
 
 st.set_page_config(page_title="Evolution Inc Dashboard", layout="wide")
 
@@ -22,7 +21,7 @@ if uploaded_file:
     # Unit price
     df["UnitPrice"] = df["Amount"] / df["TotalQty"]
 
-    # Category revenue
+    # Revenue allocation
     df["WatchRevenue"] = df["Watches"] * df["UnitPrice"]
     df["AudioRevenue"] = df["Audio"] * df["UnitPrice"]
     df["AccessoriesRevenue"] = df["Accessories"] * df["UnitPrice"]
@@ -59,14 +58,14 @@ if uploaded_file:
     st.subheader("Dealer Analytics")
 
     dealer_sales = df.groupby("Dealer").agg({
-        "Amount":"sum",
-        "TotalQty":"sum"
+        "Amount": "sum",
+        "TotalQty": "sum"
     }).reset_index()
 
     dealer_sales["ASP"] = dealer_sales["Amount"] / dealer_sales["TotalQty"]
 
     fig1 = px.bar(
-        dealer_sales.sort_values("Amount",ascending=False),
+        dealer_sales.sort_values("Amount", ascending=False),
         x="Dealer",
         y="Amount",
         color="Amount",
@@ -75,7 +74,7 @@ if uploaded_file:
 
     st.plotly_chart(fig1, use_container_width=True)
 
-    st.dataframe(dealer_sales.sort_values("Amount",ascending=False))
+    st.dataframe(dealer_sales.sort_values("Amount", ascending=False))
 
     st.divider()
 
@@ -83,6 +82,26 @@ if uploaded_file:
     st.subheader("Category Performance")
 
     category_data = {
-        "Category":["Watches","Audio","Accessories"],
-        "Units":[
-            df["Month"] = df["Date"].dt.to_period("M") 
+        "Category": ["Watches", "Audio", "Accessories"],
+        "Units": [
+            df["Watches"].sum(),
+            df["Audio"].sum(),
+            df["Accessories"].sum()
+        ]
+    }
+
+    cat_df = pd.DataFrame(category_data)
+
+    fig2 = px.pie(cat_df, names="Category", values="Units")
+
+    st.plotly_chart(fig2, use_container_width=True)
+
+    st.divider()
+
+    # Region analytics
+    st.subheader("Region Performance")
+
+    region_sales = df.groupby("Region")["Amount"].sum().reset_index()
+
+    fig3 = px.bar(
+        region_sales,
